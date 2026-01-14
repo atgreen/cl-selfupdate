@@ -14,6 +14,7 @@ Inspired by [go-github-selfupdate](https://github.com/rhysd/go-github-selfupdate
 - Atomic executable replacement with backup
 - SHA256 checksum validation
 - Token authentication (optional, for private repos or rate limits)
+- Pluggable HTTP backends (dexador or drakma)
 - Pure TLS via [pure-tls](https://github.com/atgreen/pure-tls) - no OpenSSL required
 
 ## Installation
@@ -22,12 +23,26 @@ Inspired by [go-github-selfupdate](https://github.com/rhysd/go-github-selfupdate
 ocicl install cl-selfupdate
 ```
 
+## HTTP Backend Selection
+
+cl-selfupdate supports multiple HTTP client libraries. Choose the one that fits your project:
+
+```lisp
+;; Use dexador (recommended, lighter weight)
+(asdf:load-system :cl-selfupdate/dexador)
+
+;; Or use drakma (if your project already uses it)
+(asdf:load-system :cl-selfupdate/drakma)
+```
+
+If you load the core `cl-selfupdate` system without a backend, you'll get a `no-http-backend` error when making requests.
+
 ## Usage
 
 ### Basic Self-Update (GitHub)
 
 ```lisp
-(require :cl-selfupdate)
+(require :cl-selfupdate/dexador)  ; or :cl-selfupdate/drakma
 
 ;; Set your current version
 (setf cl-selfupdate:*current-version* "1.0.0")
@@ -207,6 +222,26 @@ Supported patterns:
 
 ## API Reference
 
+### ASDF Systems
+
+- `cl-selfupdate` - Core system (requires an HTTP backend)
+- `cl-selfupdate/dexador` - Core + dexador HTTP backend
+- `cl-selfupdate/drakma` - Core + drakma HTTP backend
+
+### HTTP Backend
+
+The library uses a pluggable HTTP backend system:
+
+```lisp
+;; Check which backend is loaded
+cl-selfupdate:*http-backend*  ; => :dexador or :drakma
+
+;; Custom backends can implement these generic functions:
+(cl-selfupdate:http-request backend url &key method headers)
+(cl-selfupdate:http-get backend url &key headers)
+(cl-selfupdate:http-get-stream backend url &key headers)
+```
+
 ### Provider Classes (CLOS)
 
 The library uses CLOS for provider abstraction, making it easy to add new providers:
@@ -261,8 +296,7 @@ All high-level functions accept `:provider` which can be:
 
 ## Dependencies
 
-- [dexador](https://github.com/fukamachi/dexador) - HTTP client
-- [quri](https://github.com/fukamachi/quri) - URI handling
+Core dependencies:
 - [jsown](https://github.com/madnificent/jsown) - JSON parsing
 - [cl-semver](https://github.com/cldm/cl-semver) - Semantic versioning
 - [chipz](https://github.com/froydnj/chipz) - Decompression
@@ -273,6 +307,11 @@ All high-level functions accept `:provider` which can be:
 - [alexandria](https://gitlab.common-lisp.net/alexandria/alexandria) - Utilities
 - [cl-ppcre](https://edicl.github.io/cl-ppcre/) - Regular expressions
 - [ironclad](https://github.com/sharplispers/ironclad) - SHA256 checksums
+- [quri](https://github.com/fukamachi/quri) - URI handling
+
+HTTP backend (choose one):
+- [dexador](https://github.com/fukamachi/dexador) - HTTP client (via cl-selfupdate/dexador)
+- [drakma](https://github.com/edicl/drakma) - HTTP client (via cl-selfupdate/drakma)
 
 ## Author and License
 

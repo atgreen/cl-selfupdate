@@ -10,8 +10,8 @@
 (push #p"/home/green/git/cl-github-selfupdate/" asdf:*central-registry*)
 (push #p"/home/green/git/pure-tls/" asdf:*central-registry*)
 
-(format t "~%Loading cl-selfupdate...~%")
-(asdf:load-system :cl-selfupdate)
+(format t "~%Loading cl-selfupdate/dexador...~%")
+(asdf:load-system :cl-selfupdate/dexador)
 
 (defpackage #:selfupdate-test
   (:use #:cl #:cl-selfupdate))
@@ -43,6 +43,12 @@
   (format t "~%========================================")
   (format t "~%  cl-selfupdate Test Suite")
   (format t "~%========================================")
+
+  ;; HTTP backend tests
+  (format t "~%~%--- HTTP Backend Tests ---")
+
+  (test "HTTP backend is loaded"
+    (eq *http-backend* :dexador))
 
   ;; Platform detection tests
   (format t "~%~%--- Platform Detection Tests ---")

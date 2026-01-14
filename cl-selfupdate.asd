@@ -9,13 +9,13 @@
   (asdf:load-system :pure-tls/cl+ssl-compat)
   (asdf:register-immutable-system "cl+ssl"))
 
+;;; Core system - no HTTP client dependency
 (asdf:defsystem #:cl-selfupdate
-  :description "Self-update functionality for Common Lisp executables via GitHub/GitLab/Gitea Releases"
+  :description "Self-update functionality for Common Lisp executables via GitHub/GitLab Releases"
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
-  :version     "0.1.0"
-  :depends-on  ("dexador"
-                "jsown"
+  :version     "0.2.0"
+  :depends-on  ("jsown"
                 "cl-semver"
                 "chipz"
                 "archive"
@@ -27,6 +27,7 @@
                 "quri")
   :serial t
   :components ((:file "src/package")
+               (:file "src/http")
                (:file "src/platform")
                (:file "src/structures")
                (:file "src/provider")
@@ -35,3 +36,21 @@
                (:file "src/archives")
                (:file "src/validate")
                (:file "src/selfupdate")))
+
+;;; Dexador backend subsystem
+(asdf:defsystem #:cl-selfupdate/dexador
+  :description "Dexador HTTP backend for cl-selfupdate"
+  :author      "Anthony Green <green@moxielogic.com>"
+  :license     "MIT"
+  :version     "0.2.0"
+  :depends-on  ("cl-selfupdate" "dexador")
+  :components ((:file "src/http-dexador")))
+
+;;; Drakma backend subsystem
+(asdf:defsystem #:cl-selfupdate/drakma
+  :description "Drakma HTTP backend for cl-selfupdate"
+  :author      "Anthony Green <green@moxielogic.com>"
+  :license     "MIT"
+  :version     "0.2.0"
+  :depends-on  ("cl-selfupdate" "drakma")
+  :components ((:file "src/http-drakma")))

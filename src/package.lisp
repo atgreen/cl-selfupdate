@@ -8,6 +8,19 @@
   (:use #:cl)
   (:documentation "Self-update functionality for Common Lisp executables via GitHub/GitLab Releases.")
   (:export
+   ;; HTTP abstraction
+   #:*http-backend*
+   #:no-http-backend
+   #:http-request-error
+   #:http-error-status-code
+   #:http-error-url
+   #:http-error-body
+   #:http-request
+   #:http-get
+   #:http-get-stream
+   #:do-http-request
+   #:do-http-get
+   #:do-http-get-stream
    ;; Platform detection
    #:detect-os
    #:detect-arch

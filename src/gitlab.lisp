@@ -37,23 +37,18 @@ GitLab uses 'owner/repo' as the project identifier."
                     ,@(when token
                         `(("PRIVATE-TOKEN" . ,token))))))
     (handler-case
-        (multiple-value-bind (body status response-headers uri stream)
-            (dex:request url
-                         :method method
-                         :headers headers
-                         :want-stream nil)
-          (declare (ignore response-headers uri stream))
+        (multiple-value-bind (body status response-headers)
+            (do-http-request url :method method :headers headers)
+          (declare (ignore response-headers))
           (if (<= 200 status 299)
-              (jsown:parse (if (stringp body)
-                               body
-                               (flexi-streams:octets-to-string body :external-format :utf-8)))
+              (jsown:parse body)
               (error 'gitlab-error
                      :status-code status
                      :message (format nil "HTTP ~A" status)
                      :url url)))
-      (dex:http-request-failed (e)
+      (http-request-error (e)
         (error 'gitlab-error
-               :status-code (dex:response-status e)
+               :status-code (http-error-status-code e)
                :message (format nil "Request failed: ~A" e)
                :url url)))))
 
@@ -148,19 +143,25 @@ Returns the release with the highest version number."
          (headers `(("User-Agent" . "cl-selfupdate")
                     ,@(when token
                         `(("PRIVATE-TOKEN" . ,token))))))
-    (multiple-value-bind (body status)
-        (dex:get url :headers headers :want-stream nil :force-binary t)
-      (if (<= 200 status 299)
-          (if output-path
-              (progn
-                (alexandria:write-byte-vector-into-file body output-path
-                                                        :if-exists :supersede)
-                output-path)
-              body)
-          (error 'gitlab-error
-                 :status-code status
-                 :message "Failed to download asset"
-                 :url url)))))
+    (handler-case
+        (multiple-value-bind (body status)
+            (do-http-get url :headers headers)
+          (if (<= 200 status 299)
+              (if output-path
+                  (progn
+                    (alexandria:write-byte-vector-into-file body output-path
+                                                            :if-exists :supersede)
+                    output-path)
+                  body)
+              (error 'gitlab-error
+                     :status-code status
+                     :message "Failed to download asset"
+                     :url url)))
+      (http-request-error (e)
+        (error 'gitlab-error
+               :status-code (http-error-status-code e)
+               :message "Failed to download asset"
+               :url url)))))
 
 (defmethod download-asset-to-file ((provider gitlab-provider) asset output-path
                                    &key compute-hash)
@@ -172,26 +173,33 @@ Returns the release with the highest version number."
                         `(("PRIVATE-TOKEN" . ,token)))))
          (digest (when compute-hash
                    (ironclad:make-digest :sha256))))
-    (multiple-value-bind (stream status response-headers)
-        (dex:get url :headers headers :want-stream t :force-binary t)
-      (declare (ignore response-headers))
-      (unless (<= 200 status 299)
+    (handler-case
+        (multiple-value-bind (stream status response-headers)
+            (do-http-get-stream url :headers headers)
+          (declare (ignore response-headers))
+          (unless (<= 200 status 299)
+            (when stream (close stream))
+            (error 'gitlab-error
+                   :status-code status
+                   :message "Failed to download asset"
+                   :url url))
+          (unwind-protect
+               (with-open-file (out output-path
+                                    :direction :output
+                                    :element-type '(unsigned-byte 8)
+                                    :if-exists :supersede)
+                 (let ((buffer (make-array 65536 :element-type '(unsigned-byte 8))))
+                   (loop for bytes-read = (read-sequence buffer stream)
+                         while (plusp bytes-read)
+                         do (write-sequence buffer out :end bytes-read)
+                            (when digest
+                              (ironclad:update-digest digest buffer :end bytes-read)))))
+            (close stream)))
+      (http-request-error (e)
         (error 'gitlab-error
-               :status-code status
+               :status-code (http-error-status-code e)
                :message "Failed to download asset"
-               :url url))
-      (unwind-protect
-           (with-open-file (out output-path
-                                :direction :output
-                                :element-type '(unsigned-byte 8)
-                                :if-exists :supersede)
-             (let ((buffer (make-array 65536 :element-type '(unsigned-byte 8))))
-               (loop for bytes-read = (read-sequence buffer stream)
-                     while (plusp bytes-read)
-                     do (write-sequence buffer out :end bytes-read)
-                        (when digest
-                          (ironclad:update-digest digest buffer :end bytes-read)))))
-        (close stream)))
+               :url url)))
     (if compute-hash
         (values output-path (ironclad:byte-array-to-hex-string
                              (ironclad:produce-digest digest)))
