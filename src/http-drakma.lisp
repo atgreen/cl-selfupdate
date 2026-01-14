@@ -57,7 +57,9 @@
                            :method :get
                            :additional-headers headers
                            :want-stream t
-                           :force-binary t)
+                           :force-binary t
+                           :connection-timeout 30
+                           :redirect 10)
     (unless (<= 200 status-code 299)
       (when stream (close stream))
       (error 'http-request-error
