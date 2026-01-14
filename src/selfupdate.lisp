@@ -33,14 +33,23 @@
   "Ensure VERSION is a semver version object."
   (etypecase version
     (semver:version version)
-    (string (semver:read-version-from-string
-             (cl-ppcre:regex-replace "^v" version "")))
+    (string (handler-case
+                (semver:read-version-from-string
+                 (cl-ppcre:regex-replace "^v" version ""))
+              (error () nil)))
     (null nil)))
 
 (defun version-greater-p (v1 v2)
   "Return T if V1 is greater than V2."
-  (and v1 v2
-       (semver:version> v1 v2)))
+  (when (and (typep v1 'semver:version)
+             (typep v2 'semver:version))
+    (semver:version> v1 v2)))
+
+(defun safe-print-version (version)
+  "Return a printable version string or \"unknown\"."
+  (if version
+      (semver:print-version-to-string version)
+      "unknown"))
 
 ;;; Update detection
 
@@ -54,7 +63,7 @@ PROVIDER can be a provider instance, :github, :gitlab, or NIL for default."
   (let* ((prov (ensure-provider provider))
          (current (ensure-version current-version))
          (latest (detect-latest prov owner repo :include-prerelease include-prerelease)))
-    (if latest
+    (if (and latest (release-version latest))
         (values latest (version-greater-p (release-version latest) current))
         (values nil nil))))
 
@@ -215,7 +224,7 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
     (format *error-output* "~&Checking for updates to ~A/~A (~A)...~%"
             owner repo (provider-name prov))
     (format *error-output* "~&Current version: ~A~%"
-            (if current (semver:print-version nil current) "unknown"))
+            (safe-print-version current))
     (multiple-value-bind (release newer-p)
         (update-available-p owner repo
                             :current-version current
@@ -224,18 +233,18 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
       (cond
         ((not release)
          (format *error-output* "~&No releases found.~%")
-         (values nil nil (when current (semver:print-version nil current)) nil))
+         (values nil nil (safe-print-version current) nil))
         ((not newer-p)
          (format *error-output* "~&Already up to date.~%")
          (values nil
-                 (semver:print-version nil (release-version release))
-                 (when current (semver:print-version nil current))
+                 (safe-print-version (release-version release))
+                 (safe-print-version current)
                  nil))
         (t
          (let ((new-version (release-version release))
                (notes (release-notes release)))
            (format *error-output* "~&New version available: ~A~%"
-                   (semver:print-version nil new-version))
+                   (safe-print-version new-version))
            ;; Display release notes if available and requested
            (when (and show-notes notes (plusp (length notes)))
              (format *error-output* "~&~%Release Notes:~%~A~%~%" notes))
@@ -250,6 +259,6 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
                    (format *error-output* "~&Downloaded to: ~A~%" new-exe))
                  (apply-update new-exe :target-path target-path))
              (values t
-                     (semver:print-version nil new-version)
-                     (when current (semver:print-version nil current))
+                     (safe-print-version new-version)
+                     (safe-print-version current)
                      notes))))))))
