@@ -191,6 +191,7 @@ TARGET-PATH - path to replace (defaults to current executable)."
                                  include-prerelease
                                  (validate *validate-downloads*)
                                  (provider *default-provider*)
+                                 (show-notes t)
                                  dry-run)
   "Check for and apply updates from a GitHub or GitLab repository.
 OWNER - repository owner/namespace.
@@ -201,12 +202,14 @@ TARGET-PATH - path to the executable to replace.
 INCLUDE-PRERELEASE - if T, include prerelease versions.
 VALIDATE - if T (default), validate SHA256 checksum if available.
 PROVIDER - provider instance, :github, :gitlab, or NIL for default.
+SHOW-NOTES - if T (default), display release notes when updating.
 DRY-RUN - if T, check and download but don't apply.
 
-Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION) where:
+Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
 - UPDATED-P is T if an update was applied (or would be in dry-run).
 - NEW-VERSION is the new version string.
-- OLD-VERSION is the old version string."
+- OLD-VERSION is the old version string.
+- RELEASE-NOTES is the release notes/changelog text (or NIL)."
   (let* ((prov (ensure-provider provider))
          (current (ensure-version current-version)))
     (format *error-output* "~&Checking for updates to ~A/~A (~A)...~%"
@@ -221,16 +224,21 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION) where:
       (cond
         ((not release)
          (format *error-output* "~&No releases found.~%")
-         (values nil nil (when current (semver:print-version nil current))))
+         (values nil nil (when current (semver:print-version nil current)) nil))
         ((not newer-p)
          (format *error-output* "~&Already up to date.~%")
          (values nil
                  (semver:print-version nil (release-version release))
-                 (when current (semver:print-version nil current))))
+                 (when current (semver:print-version nil current))
+                 nil))
         (t
-         (let ((new-version (release-version release)))
+         (let ((new-version (release-version release))
+               (notes (release-notes release)))
            (format *error-output* "~&New version available: ~A~%"
                    (semver:print-version nil new-version))
+           ;; Display release notes if available and requested
+           (when (and show-notes notes (plusp (length notes)))
+             (format *error-output* "~&~%Release Notes:~%~A~%~%" notes))
            (let ((new-exe (download-update owner repo
                                            :release release
                                            :executable-name executable-name
@@ -243,4 +251,5 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION) where:
                  (apply-update new-exe :target-path target-path))
              (values t
                      (semver:print-version nil new-version)
-                     (when current (semver:print-version nil current))))))))))
+                     (when current (semver:print-version nil current))
+                     notes))))))))

@@ -74,6 +74,28 @@ ocicl install cl-selfupdate
                            :dry-run t)
 ```
 
+### Release Notes
+
+Release notes are automatically displayed during updates. You can also access them programmatically:
+
+```lisp
+;; update-self returns release notes as 4th value
+(multiple-value-bind (updated-p new-version old-version notes)
+    (cl-selfupdate:update-self "owner" "repo" :current-version "1.0.0")
+  (when notes
+    (format t "What's new:~%~A~%" notes)))
+
+;; Or get notes from a release struct
+(let ((release (cl-selfupdate:get-latest-release
+                cl-selfupdate:*github* "owner" "repo")))
+  (format t "~A~%" (cl-selfupdate:release-notes release)))
+
+;; Suppress automatic display
+(cl-selfupdate:update-self "owner" "repo"
+                           :current-version "1.0.0"
+                           :show-notes nil)
+```
+
 ### Manual Download and Apply
 
 ```lisp
