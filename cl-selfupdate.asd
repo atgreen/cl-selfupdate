@@ -4,10 +4,12 @@
 ;;;
 ;;; Copyright (C) 2026 Anthony Green <green@moxielogic.com>
 
-;;; Load pure-tls compatibility layer before any cl+ssl-dependent systems
+;;; Load pure-tls compatibility layer before any cl+ssl-dependent systems,
+;;; unless USE_LEGACY_OPENSSL is set (to use real OpenSSL via cl+ssl).
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (asdf:load-system :pure-tls/cl+ssl-compat)
-  (asdf:register-immutable-system "cl+ssl"))
+  (unless (uiop:getenvp "USE_LEGACY_OPENSSL")
+    (asdf:load-system :pure-tls/cl+ssl-compat)
+    (asdf:register-immutable-system "cl+ssl")))
 
 ;;; Core system - no HTTP client dependency
 (asdf:defsystem #:cl-selfupdate
