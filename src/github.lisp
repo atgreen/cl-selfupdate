@@ -81,7 +81,7 @@
 
 (defun validate-repo-component (value name)
   "Validate that VALUE is a safe GitHub owner or repo name.
-CLSEC-2026-0138: Reject values containing path separators or query chars."
+CL-SEC-2026-0138: Reject values containing path separators or query chars."
   (when (or (find #\/ value) (find #\? value)
             (find #\# value) (find #\& value))
     (error "Invalid ~A: ~S (contains disallowed characters)" name value))

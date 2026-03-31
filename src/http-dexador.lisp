@@ -13,7 +13,7 @@
 (setf *http-backend* :dexador)
 
 ;;; Dexador implementation
-;;; CLSEC-2026-0136: Dexador delegates TLS to cl+ssl or pure-tls.
+;;; CL-SEC-2026-0136: Dexador delegates TLS to cl+ssl or pure-tls.
 ;;; Certificate verification depends on the underlying TLS library's defaults.
 ;;; pure-tls verifies by default; cl+ssl requires explicit configuration.
 

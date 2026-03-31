@@ -53,7 +53,7 @@ If INPUT-DATA is a stream, reads it entirely into memory first (chipz requires t
   "Extract a safe basename from an archive entry name.
 Rejects entries containing path traversal sequences."
   (let ((basename (file-namestring name)))
-    ;; CLSEC-2026-0137: Reject entries with path traversal
+    ;; CL-SEC-2026-0137: Reject entries with path traversal
     (when (or (search ".." name)
               (search ".." basename)
               (zerop (length basename)))
@@ -63,7 +63,7 @@ Rejects entries containing path traversal sequences."
 (defun executable-name-match-p (basename executable-name)
   "Check if BASENAME matches EXECUTABLE-NAME.
 Uses exact match only -- no substring matching."
-  ;; CLSEC-2026-0137: Use exact match, not substring search
+  ;; CL-SEC-2026-0137: Use exact match, not substring search
   (or (string= basename executable-name)
       ;; Also match with common extensions stripped
       (string= (pathname-name basename) executable-name)))

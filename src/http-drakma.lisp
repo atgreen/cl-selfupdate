@@ -13,7 +13,7 @@
 (setf *http-backend* :drakma)
 
 ;;; Drakma implementation
-;;; CLSEC-2026-0136: All requests explicitly enable TLS verification.
+;;; CL-SEC-2026-0136: All requests explicitly enable TLS verification.
 
 (defmethod http-request ((backend (eql :drakma)) url &key (method :get) headers)
   "Make an HTTP request using drakma, returning body as string."

@@ -115,13 +115,13 @@ PROVIDER - provider instance, :github, :gitlab, or NIL for default."
     (unless asset
       (error "No matching asset found for platform ~A in release ~A"
              (detect-platform) (release-tag rel)))
-    ;; CLSEC-2026-0134: Warn when no checksum is available
+    ;; CL-SEC-2026-0134: Warn when no checksum is available
     (when (and *validate-downloads*
                (null (find-checksum-asset rel asset)))
       (format *error-output*
               "~&WARNING: No checksum file found for ~A. Download will not be verified.~%"
               (asset-name asset)))
-    ;; CLSEC-2026-0136: Verify asset size as a basic sanity check
+    ;; CL-SEC-2026-0136: Verify asset size as a basic sanity check
     (ensure-directories-exist temp-dir)
     (let ((archive-path (merge-pathnames (asset-name asset) temp-dir))
           (cleanup-p (not output-dir)))  ; only clean up auto-created temp dirs
@@ -145,7 +145,7 @@ PROVIDER - provider instance, :github, :gitlab, or NIL for default."
                     (format *error-output* "~&Extracting...~%")
                     (extract-archive archive-path temp-dir
                                      :executable-name executable-name)))))
-        ;; CLSEC-2026-0135: Clean up temp dir on failure
+        ;; CL-SEC-2026-0135: Clean up temp dir on failure
         (error (e)
           (when cleanup-p (cleanup-temp-dir temp-dir))
           (error e))))))
@@ -286,7 +286,7 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
            ;; Display release notes if available and requested
            (when (and show-notes notes (plusp (length notes)))
              (format *error-output* "~&~%Release Notes:~%~A~%~%" notes))
-           ;; CLSEC-2026-0138: Verify this is actually an upgrade, not a downgrade
+           ;; CL-SEC-2026-0138: Verify this is actually an upgrade, not a downgrade
            (when (and current (release-version release)
                       (not (version-greater-p (release-version release) current)))
              (error "Refusing to downgrade from ~A to ~A"
