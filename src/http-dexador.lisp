@@ -13,6 +13,9 @@
 (setf *http-backend* :dexador)
 
 ;;; Dexador implementation
+;;; CLSEC-2026-0136: Dexador delegates TLS to cl+ssl or pure-tls.
+;;; Certificate verification depends on the underlying TLS library's defaults.
+;;; pure-tls verifies by default; cl+ssl requires explicit configuration.
 
 (defmethod http-request ((backend (eql :dexador)) url &key (method :get) headers)
   "Make an HTTP request using dexador, returning body as string."

@@ -51,6 +51,29 @@
       (semver:print-version-to-string version)
       "unknown"))
 
+(defun make-secure-temp-dir ()
+  "Create a temporary directory with an unpredictable name.
+Uses mkdtemp on SBCL for secure creation, falls back to random suffix."
+  (let ((template (format nil "~Acl-selfupdate-XXXXXX"
+                          (uiop:native-namestring (uiop:temporary-directory)))))
+    #+sbcl
+    (let ((path (sb-posix:mkdtemp template)))
+      (uiop:ensure-directory-pathname path))
+    #-sbcl
+    (let* ((random-suffix (format nil "~36R" (random (expt 36 12))))
+           (path (format nil "~Acl-selfupdate-~A/"
+                         (uiop:temporary-directory)
+                         random-suffix)))
+      (ensure-directories-exist path)
+      (uiop:ensure-directory-pathname path))))
+
+(defun cleanup-temp-dir (dir)
+  "Remove a temporary directory and its contents."
+  (handler-case
+      (uiop:delete-directory-tree dir :validate t :if-does-not-exist :ignore)
+    (error (e)
+      (format *error-output* "~&Warning: could not clean up ~A: ~A~%" dir e))))
+
 ;;; Update detection
 
 (defun update-available-p (owner repo &key (current-version *current-version*)
@@ -84,9 +107,7 @@ PROVIDER - provider instance, :github, :gitlab, or NIL for default."
          (asset (find-matching-asset rel))
          (temp-dir (or output-dir
                        (uiop:ensure-pathname
-                        (format nil "~A/cl-selfupdate-~A/"
-                                (uiop:temporary-directory)
-                                (get-universal-time))
+                        (make-secure-temp-dir)
                         :ensure-directory t)))
          (*validate-downloads* validate))
     (unless rel
@@ -94,23 +115,40 @@ PROVIDER - provider instance, :github, :gitlab, or NIL for default."
     (unless asset
       (error "No matching asset found for platform ~A in release ~A"
              (detect-platform) (release-tag rel)))
-    ;; Download the asset (with optional validation)
+    ;; CLSEC-2026-0134: Warn when no checksum is available
+    (when (and *validate-downloads*
+               (null (find-checksum-asset rel asset)))
+      (format *error-output*
+              "~&WARNING: No checksum file found for ~A. Download will not be verified.~%"
+              (asset-name asset)))
+    ;; CLSEC-2026-0136: Verify asset size as a basic sanity check
     (ensure-directories-exist temp-dir)
-    (let ((archive-path (merge-pathnames (asset-name asset) temp-dir)))
-      (format *error-output* "~&Downloading ~A (~:D bytes)...~%"
-              (asset-name asset) (asset-size asset))
-      ;; Stream download directly to file (more memory efficient)
-      (download-and-validate-asset-to-file prov asset rel archive-path)
-      ;; Extract if it's an archive
-      (let ((format (detect-archive-format (asset-name asset))))
-        (if (eq format :unknown)
-            ;; Raw binary - just return it
-            archive-path
-            ;; Extract archive
-            (progn
-              (format *error-output* "~&Extracting...~%")
-              (extract-archive archive-path temp-dir
-                               :executable-name executable-name)))))))
+    (let ((archive-path (merge-pathnames (asset-name asset) temp-dir))
+          (cleanup-p (not output-dir)))  ; only clean up auto-created temp dirs
+      (handler-case
+          (progn
+            (format *error-output* "~&Downloading ~A (~:D bytes)...~%"
+                    (asset-name asset) (asset-size asset))
+            (download-and-validate-asset-to-file prov asset rel archive-path)
+            ;; Verify downloaded size matches reported size
+            (let ((actual-size (with-open-file (f archive-path) (file-length f))))
+              (when (and (asset-size asset) (plusp (asset-size asset))
+                         (/= actual-size (asset-size asset)))
+                (delete-file archive-path)
+                (error "Size mismatch: expected ~:D bytes, got ~:D bytes"
+                       (asset-size asset) actual-size)))
+            ;; Extract if it's an archive
+            (let ((format (detect-archive-format (asset-name asset))))
+              (if (eq format :unknown)
+                  archive-path
+                  (progn
+                    (format *error-output* "~&Extracting...~%")
+                    (extract-archive archive-path temp-dir
+                                     :executable-name executable-name)))))
+        ;; CLSEC-2026-0135: Clean up temp dir on failure
+        (error (e)
+          (when cleanup-p (cleanup-temp-dir temp-dir))
+          (error e))))))
 
 ;;; Executable replacement
 
@@ -248,6 +286,12 @@ Returns (VALUES UPDATED-P NEW-VERSION OLD-VERSION RELEASE-NOTES) where:
            ;; Display release notes if available and requested
            (when (and show-notes notes (plusp (length notes)))
              (format *error-output* "~&~%Release Notes:~%~A~%~%" notes))
+           ;; CLSEC-2026-0138: Verify this is actually an upgrade, not a downgrade
+           (when (and current (release-version release)
+                      (not (version-greater-p (release-version release) current)))
+             (error "Refusing to downgrade from ~A to ~A"
+                    (safe-print-version current)
+                    (safe-print-version (release-version release))))
            (let ((new-exe (download-update owner repo
                                            :release release
                                            :executable-name executable-name

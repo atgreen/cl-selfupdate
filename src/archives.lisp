@@ -49,6 +49,25 @@ If INPUT-DATA is a stream, reads it entirely into memory first (chipz requires t
 
 ;;; Archive extraction
 
+(defun safe-basename (name)
+  "Extract a safe basename from an archive entry name.
+Rejects entries containing path traversal sequences."
+  (let ((basename (file-namestring name)))
+    ;; CLSEC-2026-0137: Reject entries with path traversal
+    (when (or (search ".." name)
+              (search ".." basename)
+              (zerop (length basename)))
+      (return-from safe-basename nil))
+    basename))
+
+(defun executable-name-match-p (basename executable-name)
+  "Check if BASENAME matches EXECUTABLE-NAME.
+Uses exact match only -- no substring matching."
+  ;; CLSEC-2026-0137: Use exact match, not substring search
+  (or (string= basename executable-name)
+      ;; Also match with common extensions stripped
+      (string= (pathname-name basename) executable-name)))
+
 (defun extract-tar-from-stream (input-stream output-dir &key executable-name)
   "Extract a tar archive from stream to output directory.
 If EXECUTABLE-NAME is provided, only extract that file and return its path."
@@ -56,12 +75,13 @@ If EXECUTABLE-NAME is provided, only extract that file and return its path."
   (archive:with-open-archive (archive input-stream :direction :input)
     (archive:do-archive-entries (entry archive)
       (let* ((name (archive:name entry))
-             (basename (file-namestring name))
-             (output-path (merge-pathnames basename output-dir)))
-        (when (and (archive:entry-regular-file-p entry)
+             (basename (safe-basename name))
+             (output-path (when basename (merge-pathnames basename output-dir))))
+        (when (and basename
+                   output-path
+                   (archive:entry-regular-file-p entry)
                    (or (null executable-name)
-                       (string= basename executable-name)
-                       (search executable-name basename)))
+                       (executable-name-match-p basename executable-name)))
           (with-open-file (out output-path
                                :direction :output
                                :element-type '(unsigned-byte 8)
@@ -93,13 +113,13 @@ If EXECUTABLE-NAME is provided, only extract that file and return its path."
   (ensure-directories-exist output-dir)
   (zip:with-zipfile (zipfile archive-path)
     (zip:do-zipfile-entries (name entry zipfile)
-      (let* ((basename (file-namestring name))
-             (output-path (merge-pathnames basename output-dir)))
-        (when (and (plusp (length basename))
+      (let* ((basename (safe-basename name))
+             (output-path (when basename (merge-pathnames basename output-dir))))
+        (when (and basename
+                   output-path
                    (not (char= (char name (1- (length name))) #\/))
                    (or (null executable-name)
-                       (string= basename executable-name)
-                       (search executable-name basename)))
+                       (executable-name-match-p basename executable-name)))
           (alexandria:write-byte-vector-into-file
            (zip:zipfile-entry-contents entry)
            output-path

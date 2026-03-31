@@ -13,6 +13,7 @@
 (setf *http-backend* :drakma)
 
 ;;; Drakma implementation
+;;; CLSEC-2026-0136: All requests explicitly enable TLS verification.
 
 (defmethod http-request ((backend (eql :drakma)) url &key (method :get) headers)
   "Make an HTTP request using drakma, returning body as string."
@@ -20,6 +21,7 @@
       (drakma:http-request url
                            :method method
                            :additional-headers headers
+                           :verify :required
                            :want-stream nil
                            :force-binary nil)
     (declare (ignore uri stream must-close reason-phrase))
@@ -40,6 +42,7 @@
       (drakma:http-request url
                            :method :get
                            :additional-headers headers
+                           :verify :required
                            :want-stream nil
                            :force-binary t)
     (declare (ignore uri stream must-close reason-phrase))
@@ -56,6 +59,7 @@
       (drakma:http-request url
                            :method :get
                            :additional-headers headers
+                           :verify :required
                            :want-stream t
                            :force-binary t
                            :connection-timeout 30

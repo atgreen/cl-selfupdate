@@ -77,10 +77,22 @@
    :download-url (jsown:val json "browser_download_url")
    :content-type (jsown:val json "content_type")))
 
+;;; Input validation
+
+(defun validate-repo-component (value name)
+  "Validate that VALUE is a safe GitHub owner or repo name.
+CLSEC-2026-0138: Reject values containing path separators or query chars."
+  (when (or (find #\/ value) (find #\? value)
+            (find #\# value) (find #\& value))
+    (error "Invalid ~A: ~S (contains disallowed characters)" name value))
+  value)
+
 ;;; Generic function methods for GitHub
 
 (defmethod list-releases ((provider github-provider) owner repo &key (per-page 30))
   "List releases for a GitHub repository."
+  (validate-repo-component owner "owner")
+  (validate-repo-component repo "repo")
   (let* ((endpoint (format nil "/repos/~A/~A/releases?per_page=~A" owner repo per-page))
          (json (github-request provider endpoint)))
     (mapcar #'parse-github-release json)))
