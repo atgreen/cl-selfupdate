@@ -16,7 +16,7 @@
   :description "Self-update functionality for Common Lisp executables via GitHub/GitLab Releases"
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
-  :version     "1.0.0"
+  :version     "1.0.1-dev"
   :depends-on  ("jsown"
                 "cl-semver"
                 "chipz"
@@ -44,7 +44,7 @@
   :description "Dexador HTTP backend for cl-selfupdate"
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
-  :version     "1.0.0"
+  :version     "1.0.1-dev"
   :depends-on  ("cl-selfupdate" "dexador")
   :components ((:file "src/http-dexador")))
 
@@ -53,6 +53,6 @@
   :description "Drakma HTTP backend for cl-selfupdate"
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
-  :version     "1.0.0"
+  :version     "1.0.1-dev"
   :depends-on  ("cl-selfupdate" "drakma")
   :components ((:file "src/http-drakma")))
